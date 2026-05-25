@@ -1,11 +1,11 @@
-const CACHE_NAME = "popcorn-archive-v11";
+const CACHE_NAME = "popcorn-archive-v12";
 const APP_SHELL = [
   "./",
   "index.html",
   "styles.css",
   "app.js",
   "manifest.json",
-  "assets/top_movies_catalog.csv",
+  "assets/top_movies_catalog_new.csv",
   "assets/icons/bookmark.svg",
   "assets/icons/calendar.svg",
   "assets/icons/dice.svg",

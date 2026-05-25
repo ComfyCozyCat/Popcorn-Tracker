@@ -46,11 +46,12 @@ const TITLE_PARTS = {
 };
 
 const DB_NAME = "popcorn-archive-db";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const MOVIES_STORE = "movies";
 const YEAR_COUNT = 10;
 const MOVIES_PER_YEAR = 10;
 const CARD_DISPLAY_SETTINGS_KEY = "popcorn-archive-card-display";
+const CATALOG_PATH = "assets/top_movies_catalog_new.csv";
 const SENTIMENT = {
   UP: "up",
   DOWN: "down"
@@ -149,13 +150,31 @@ const openDatabase = () => {
 
     request.addEventListener("upgradeneeded", () => {
       const database = request.result;
+      const store = database.objectStoreNames.contains(MOVIES_STORE)
+        ? request.transaction.objectStore(MOVIES_STORE)
+        : database.createObjectStore(MOVIES_STORE, { keyPath: "id" });
 
-      if (!database.objectStoreNames.contains(MOVIES_STORE)) {
-        const store = database.createObjectStore(MOVIES_STORE, { keyPath: "id" });
+      if (store.indexNames.contains("yearRank")) {
+        store.deleteIndex("yearRank");
+      }
+
+      if (!store.indexNames.contains("year")) {
         store.createIndex("year", "year", { unique: false });
-        store.createIndex("yearRank", ["year", "rank"], { unique: true });
+      }
+
+      if (!store.indexNames.contains("yearSequence")) {
+        store.createIndex("yearSequence", ["year", "sequence"], { unique: true });
+      }
+
+      if (!store.indexNames.contains("title")) {
         store.createIndex("title", "title", { unique: false });
+      }
+
+      if (!store.indexNames.contains("watched")) {
         store.createIndex("watched", "watched", { unique: false });
+      }
+
+      if (!store.indexNames.contains("watchlist")) {
         store.createIndex("watchlist", "watchlist", { unique: false });
       }
     });
@@ -249,15 +268,16 @@ const parseCsv = (csvText) => {
   });
 };
 
-const normalizeMovieRecord = (record) => {
+const normalizeMovieRecord = (record, sequence) => {
   const year = Number.parseInt(record.year, 10);
-  const rank = Number.parseInt(record.rank, 10);
+  const displayRank = Number.parseInt(record.rank, 10);
   const now = new Date().toISOString();
 
   return {
-    id: `${year}-${rank}`,
+    id: `${year}-${sequence}`,
     year,
-    rank,
+    rank: displayRank,
+    sequence,
     title: record.title,
     distributor: record.distributor,
     rentalUsd: Number.parseInt(record.rental_usd, 10) || null,
@@ -286,30 +306,61 @@ const normalizeMovieRecord = (record) => {
   };
 };
 
-const seedDatabaseIfNeeded = async (database) => {
-  const count = await readRequest(
-    database.transaction(MOVIES_STORE, "readonly").objectStore(MOVIES_STORE).count()
-  );
+const normalizeCatalogRecords = (records) => {
+  const yearCounts = new Map();
 
-  if (count > 0) {
-    return;
-  }
+  return records.map((record) => {
+    const year = Number.parseInt(record.year, 10);
+    const nextSequence = (yearCounts.get(year) ?? 0) + 1;
+    yearCounts.set(year, nextSequence);
+    return normalizeMovieRecord(record, nextSequence);
+  });
+};
 
-  const response = await fetch("assets/top_movies_catalog.csv", { cache: "no-store" });
+const syncDatabaseFromCatalog = async (database) => {
+  const response = await fetch(CATALOG_PATH, { cache: "no-store" });
 
   if (!response.ok) {
     throw new Error("Unable to load movie seed data.");
   }
 
   const csvText = await response.text();
-  const records = parseCsv(csvText).map(normalizeMovieRecord);
+  const records = normalizeCatalogRecords(parseCsv(csvText));
 
   await new Promise((resolve, reject) => {
     const transaction = database.transaction(MOVIES_STORE, "readwrite");
     const store = transaction.objectStore(MOVIES_STORE);
+    const activeIds = new Set(records.map((record) => record.id));
 
     records.forEach((record) => {
-      store.put(record);
+      const getRequest = store.get(record.id);
+
+      getRequest.addEventListener("success", () => {
+        const existingRecord = getRequest.result;
+
+        store.put({
+          ...record,
+          watched: existingRecord?.watched ?? record.watched,
+          watchlist: existingRecord?.watchlist ?? record.watchlist,
+          favorite: existingRecord?.favorite ?? record.favorite,
+          sentiment: existingRecord?.sentiment ?? record.sentiment,
+          calendarMarked: existingRecord?.calendarMarked ?? record.calendarMarked,
+          personalRating: existingRecord?.personalRating ?? record.personalRating,
+          notes: existingRecord?.notes ?? record.notes,
+          createdAt: existingRecord?.createdAt ?? record.createdAt,
+          updatedAt: existingRecord ? new Date().toISOString() : record.updatedAt
+        });
+      });
+    });
+
+    const allRequest = store.getAll();
+
+    allRequest.addEventListener("success", () => {
+      allRequest.result.forEach((record) => {
+        if (!activeIds.has(record.id)) {
+          store.delete(record.id);
+        }
+      });
     });
 
     transaction.addEventListener("complete", () => {
@@ -333,7 +384,7 @@ const getMoviesByYear = async (database, year) => {
   const request = index.getAll(year);
   const results = await readRequest(request);
 
-  return results.sort((left, right) => left.rank - right.rank);
+  return results.sort((left, right) => left.sequence - right.sequence);
 };
 
 const makeMovieTitle = (year, index) => {
@@ -371,6 +422,7 @@ const mapDatabaseMovieToCard = (movie) => {
     id: movie.id,
     year: movie.year,
     rank: movie.rank,
+    sequence: movie.sequence,
     title: movie.title,
     displayLabel: `#${movie.rank}`,
     cover: movie.localPosterPath || movie.posterThumbnailUrl || movie.posterImageUrl || PLACEHOLDER_COVERS[movie.rank % PLACEHOLDER_COVERS.length],
@@ -395,7 +447,7 @@ const buildFiftiesData = async () => {
 
   try {
     database = await openDatabase();
-    await seedDatabaseIfNeeded(database);
+    await syncDatabaseFromCatalog(database);
   } catch (error) {
     console.warn("Movie database setup failed:", error);
   }

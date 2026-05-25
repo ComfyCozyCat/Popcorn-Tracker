@@ -84,12 +84,12 @@ Then build up the movie features one step at a time.
 
 ## Current Checkpoint
 
-The app has moved beyond the initial shell and now includes a functioning browse experience for the 1950s movie grid.
+The app has moved beyond the initial shell and now includes a functioning browse experience for the full 1950s movie grid.
 
 Implemented so far:
 
 - Year-by-year horizontal cover rows with expand/collapse controls
-- IndexedDB-backed movie records seeded from the catalog CSV
+- IndexedDB-backed movie records synced from the catalog CSV
 - Detail card overlay with responsive desktop and mobile layouts
 - Favorite, thumbs up, thumbs down, and watch-later calendar actions in the detail card
 - Watched-state updates tied to thumbs selection with live year progress updates
@@ -97,6 +97,8 @@ Implemented so far:
 - Persistent `Show:` toolbar preferences saved in local storage
 - Responsive decade navigation that expands when space allows and scrolls when it does not
 - Top-bar action buttons for random, filter, and search
+- Real movie coverage for 1950 through 1959 with imported poster art
+- Tied-rank handling using a stable internal sequence separate from displayed rank
 
 ## Ready For Next Step
 

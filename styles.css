@@ -1124,6 +1124,72 @@ img {
   }
 }
 
+@media (min-width: 1500px) {
+  .content {
+    width: min(100%, 1760px);
+  }
+
+  .library-decade {
+    gap: 28px;
+  }
+
+  .year-row {
+    padding: 24px 28px;
+  }
+
+  .movie-track {
+    gap: 18px;
+  }
+
+  .movie-card {
+    flex: 0 0 clamp(182px, 14.5vw, 250px);
+  }
+}
+
+@media (min-width: 1800px) {
+  .content {
+    width: min(100%, calc(100vw - 56px));
+  }
+
+  .library-decade {
+    gap: 32px;
+  }
+
+  .year-row {
+    padding: 28px 30px;
+  }
+
+  .movie-track {
+    gap: 20px;
+    padding-bottom: 10px;
+  }
+
+  .movie-card {
+    flex: 0 0 clamp(214px, 12.8vw, 298px);
+  }
+
+  .movie-card-meta {
+    min-height: 94px;
+    padding: 18px 18px 16px;
+  }
+
+  .movie-card-meta span:first-child {
+    font-size: 1.28rem;
+  }
+
+  .movie-card-detail {
+    min-height: 46px;
+    padding: 6px 18px 4px;
+    font-size: 0.96rem;
+  }
+
+  .movie-card-actions {
+    min-height: 62px;
+    gap: 16px;
+    padding: 10px 18px 24px;
+  }
+}
+
 @media (max-width: 760px) {
   .movie-detail-overlay {
     align-items: start;

@@ -21,73 +21,172 @@
           </span>
         </a>
 
-        <button class="icon-button" type="button" aria-label="Search and filter movies">
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <path d="m21 21-4.3-4.3"></path>
-            <circle cx="11" cy="11" r="7"></circle>
-          </svg>
-        </button>
+        <div class="top-bar-actions" aria-label="Search and filter controls">
+          <button class="icon-button" type="button" aria-label="Pick a random movie">
+            <img class="icon-button-image icon-button-image-random" src="assets/icons/dice.svg" alt="" aria-hidden="true">
+          </button>
+          <button class="icon-button" type="button" aria-label="Filter movies">
+            <img class="icon-button-image" src="assets/icons/filter.svg" alt="" aria-hidden="true">
+          </button>
+          <button class="icon-button" type="button" aria-label="Search movies">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="m21 21-4.3-4.3"></path>
+              <circle cx="11" cy="11" r="7"></circle>
+            </svg>
+          </button>
+        </div>
       </header>
 
-      <nav class="decade-nav" aria-label="Browse by decade">
-        <button class="decade-chip is-active" type="button">50's</button>
-        <button class="decade-chip" type="button">60's</button>
-        <button class="decade-chip" type="button">70's</button>
-        <button class="decade-chip" type="button">80's</button>
-        <button class="decade-chip" type="button">90's</button>
-        <button class="decade-chip" type="button">2000s</button>
-        <button class="decade-chip" type="button">2010s</button>
-        <button class="decade-chip" type="button">2020s</button>
-      </nav>
+      <div id="decade-nav-shell" class="decade-nav-shell">
+        <button
+          id="decade-nav-prev"
+          class="edge-button edge-button-left decade-edge-button"
+          type="button"
+          aria-label="Scroll decades to the left"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M14.5 5.5 8 12l6.5 6.5"></path>
+          </svg>
+        </button>
+
+        <nav id="decade-nav" class="decade-nav" aria-label="Browse by decade">
+          <button class="decade-chip is-active" type="button">50's</button>
+          <button class="decade-chip" type="button">60's</button>
+          <button class="decade-chip" type="button">70's</button>
+          <button class="decade-chip" type="button">80's</button>
+          <button class="decade-chip" type="button">90's</button>
+          <button class="decade-chip" type="button">2000s</button>
+          <button class="decade-chip" type="button">2010s</button>
+          <button class="decade-chip" type="button">2020s</button>
+        </nav>
+
+        <button
+          id="decade-nav-next"
+          class="edge-button edge-button-right decade-edge-button"
+          type="button"
+          aria-label="Scroll decades to the right"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M9.5 5.5 16 12l-6.5 6.5"></path>
+          </svg>
+        </button>
+      </div>
 
       <main class="content">
-        <section class="section-heading" aria-labelledby="library-title">
-          <p class="eyebrow">Popcorn theme</p>
-          <h1 id="library-title">Movie Library</h1>
-        </section>
+        <section class="library-decade" aria-labelledby="fifties-title">
+          <div class="section-copy">
+            <h2 id="fifties-title">Scroll Through the 1950s</h2>
+            <p class="section-description">
+              Cruise through each year, compare classics side by side, and scroll
+              around until you spot your next favorite.
+            </p>
+          </div>
 
-        <section class="poster-grid" aria-label="Movie cover placeholders">
-          <article class="movie-card">
-            <img src="assets/placeholders/missing-action.png" alt="Missing Cover action placeholder">
-            <div class="movie-card-meta">
-              <span>Action</span>
-              <span>Unrated</span>
-            </div>
-          </article>
+          <div class="year-toolbar" aria-label="Year display controls">
+            <span class="year-toolbar-label">Expand:</span>
+            <button id="expand-all-button" class="year-toolbar-button" type="button">
+              <img src="assets/icons/expand-all.svg" alt="" aria-hidden="true">
+              <span>All</span>
+            </button>
+            <button id="expand-none-button" class="year-toolbar-button" type="button">
+              <img src="assets/icons/expand-none.svg" alt="" aria-hidden="true">
+              <span>None</span>
+            </button>
 
-          <article class="movie-card">
-            <img src="assets/placeholders/missing-romance.png" alt="Missing Cover romance placeholder">
-            <div class="movie-card-meta">
-              <span>Romance</span>
-              <span>Unrated</span>
-            </div>
-          </article>
+            <span class="year-toolbar-divider" aria-hidden="true"></span>
 
-          <article class="movie-card">
-            <img src="assets/placeholders/missing-noir.png" alt="Missing Cover noir placeholder">
-            <div class="movie-card-meta">
-              <span>Noir</span>
-              <span>Unrated</span>
-            </div>
-          </article>
+            <span class="year-toolbar-label">Show:</span>
+            <button id="toggle-studio-button" class="year-toolbar-button is-active" type="button" aria-pressed="true">
+              <span>Studio</span>
+            </button>
+            <button id="toggle-title-button" class="year-toolbar-button is-active" type="button" aria-pressed="true">
+              <span>Title</span>
+            </button>
+            <button id="toggle-ratings-button" class="year-toolbar-button is-active" type="button" aria-pressed="true">
+              <span>Ratings</span>
+            </button>
+          </div>
 
-          <article class="movie-card">
-            <img src="assets/placeholders/missing-horror.png" alt="Missing Cover horror placeholder">
-            <div class="movie-card-meta">
-              <span>Horror</span>
-              <span>Unrated</span>
-            </div>
-          </article>
-
-          <article class="movie-card">
-            <img src="assets/placeholders/missing-adventure.png" alt="Missing Cover adventure placeholder">
-            <div class="movie-card-meta">
-              <span>Adventure</span>
-              <span>Unrated</span>
-            </div>
-          </article>
+          <div id="year-rows" class="year-rows" aria-live="polite"></div>
         </section>
       </main>
+    </div>
+
+    <div id="movie-detail-overlay" class="movie-detail-overlay" hidden>
+      <div class="movie-detail-backdrop" data-close-detail="true"></div>
+      <section
+        id="movie-detail-card"
+        class="movie-detail-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="movie-detail-title"
+        tabindex="-1"
+      >
+        <button
+          id="movie-detail-close"
+          class="movie-detail-close"
+          type="button"
+          aria-label="Close movie details"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M6 6 18 18"></path>
+            <path d="M18 6 6 18"></path>
+          </svg>
+        </button>
+
+        <div class="movie-detail-layout">
+          <img id="movie-detail-poster" class="movie-detail-poster" src="" alt="">
+
+          <div class="movie-detail-copy">
+            <p id="movie-detail-kicker" class="movie-detail-kicker"></p>
+            <h2 id="movie-detail-title"></h2>
+            <p id="movie-detail-distributor" class="movie-detail-distributor"></p>
+
+            <dl class="movie-detail-facts">
+              <div>
+                <dt>Rank</dt>
+                <dd id="movie-detail-rank"></dd>
+              </div>
+              <div>
+                <dt>Rental</dt>
+                <dd id="movie-detail-rental"></dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd id="movie-detail-status"></dd>
+              </div>
+              <div>
+                <dt>Rating</dt>
+                <dd id="movie-detail-rating"></dd>
+              </div>
+            </dl>
+
+            <div class="movie-detail-links">
+              <a id="movie-detail-film-link" class="movie-detail-link" href="" target="_blank" rel="noreferrer noopener">
+                <span class="movie-detail-link-icon" aria-hidden="true">
+                  <img src="assets/icons/wikipedia.svg" alt="">
+                </span>
+                <span>Wikipedia</span>
+              </a>
+            </div>
+
+            <div class="movie-detail-actions" aria-label="Movie reactions">
+              <button id="movie-detail-favorite" class="movie-detail-action movie-detail-action-favorite" type="button">
+                <img src="assets/icons/ribbon.svg" alt="" aria-hidden="true">
+              </button>
+              <button id="movie-detail-like" class="movie-detail-action movie-detail-action-thumb" type="button" aria-label="Mark movie thumbs up">
+                <img src="assets/icons/thumbs-up.svg" alt="" aria-hidden="true">
+              </button>
+              <button id="movie-detail-dislike" class="movie-detail-action movie-detail-action-thumb" type="button" aria-label="Mark movie thumbs down">
+                <img src="assets/icons/thumbs-down.svg" alt="" aria-hidden="true">
+              </button>
+              <button id="movie-detail-calendar" class="movie-detail-action movie-detail-action-thumb movie-detail-action-calendar" type="button" aria-label="Toggle movie calendar action">
+                <img src="assets/icons/calendar.svg" alt="" aria-hidden="true">
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
 
     <script src="app.js"></script>

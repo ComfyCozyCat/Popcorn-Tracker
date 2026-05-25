@@ -82,3 +82,29 @@ Start with a simple Hello World PWA shell:
 
 Then build up the movie features one step at a time.
 
+## Current Checkpoint
+
+The app has moved beyond the initial shell and now includes a functioning browse experience for the 1950s movie grid.
+
+Implemented so far:
+
+- Year-by-year horizontal cover rows with expand/collapse controls
+- IndexedDB-backed movie records seeded from the catalog CSV
+- Detail card overlay with responsive desktop and mobile layouts
+- Favorite, thumbs up, thumbs down, and watch-later calendar actions in the detail card
+- Watched-state updates tied to thumbs selection with live year progress updates
+- Ticket-style stub treatment on grid cards with visibility toggles for title, studio, and ratings
+- Persistent `Show:` toolbar preferences saved in local storage
+- Responsive decade navigation that expands when space allows and scrolls when it does not
+- Top-bar action buttons for random, filter, and search
+
+## Ready For Next Step
+
+The current UI checkpoint is committed as a milestone before the next feature pass.
+
+Most likely next work areas:
+
+- Hook the top-bar random and filter buttons to real behavior
+- Add deeper filtering and search flows
+- Expand beyond the 1950s into additional decade datasets
+- Add richer editing inside the detail card

@@ -1,4 +1,4 @@
-const CACHE_NAME = "popcorn-archive-v23";
+const CACHE_NAME = "popcorn-archive-v24";
 const APP_SHELL = [
   "./",
   "index.html",

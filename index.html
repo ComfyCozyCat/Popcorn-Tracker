@@ -25,7 +25,7 @@
           <button id="random-movie-button" class="icon-button" type="button" aria-label="Pick a random movie">
             <img class="icon-button-image icon-button-image-random" src="assets/icons/dice.svg" alt="" aria-hidden="true">
           </button>
-          <button class="icon-button" type="button" aria-label="Filter movies">
+          <button id="filter-toggle-button" class="icon-button" type="button" aria-label="Filter movies" aria-expanded="false" aria-controls="filter-panel">
             <img class="icon-button-image" src="assets/icons/filter.svg" alt="" aria-hidden="true">
           </button>
           <button class="icon-button" type="button" aria-label="Search movies">
@@ -72,6 +72,20 @@
         </button>
       </div>
 
+      <section id="filter-panel" class="filter-panel" aria-label="Movie filters" hidden>
+        <div class="filter-panel-header">
+          <div>
+            <h2>Filters</h2>
+            <p id="filter-summary" class="filter-summary">Showing all movies</p>
+          </div>
+          <button id="filter-clear-button" class="filter-clear-button" type="button" hidden>
+            Clear
+          </button>
+        </div>
+
+        <div id="filter-groups" class="filter-groups"></div>
+      </section>
+
       <main class="content">
         <section class="library-decade" aria-labelledby="fifties-title">
           <div class="section-copy">
@@ -108,6 +122,7 @@
           </div>
 
           <div id="year-rows" class="year-rows" aria-live="polite"></div>
+          <p id="filter-empty-state" class="filter-empty-state" hidden>No movies match those filters.</p>
         </section>
       </main>
     </div>
@@ -159,6 +174,8 @@
                 <dd id="movie-detail-runtime"></dd>
               </div>
             </dl>
+
+            <div id="movie-detail-tags" class="movie-detail-tags" aria-label="Movie tags"></div>
 
             <div class="movie-detail-links">
               <a id="movie-detail-film-link" class="movie-detail-link" href="" target="_blank" rel="noreferrer noopener">

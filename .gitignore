@@ -1,5 +1,17 @@
 .agents/
 .codex/
 trash/
+PROJECT_PLAN.md
+ticket-designs.html
+ticket-designs.css
+movie-tracker-pwa-initial.bundle
+assets/top_movies_catalog_new.csv
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.*
 .DS_Store
 Thumbs.db

@@ -161,7 +161,8 @@ const appState = {
   randomPickerReady: false,
   randomPickerRevealed: false,
   randomPickerChoosing: false,
-  activeFilters: new Set()
+  activeFilters: new Set(),
+  searchQuery: ""
 };
 
 const registerServiceWorker = async () => {
@@ -359,7 +360,10 @@ const tokenizeNameBlob = (value) => {
     .filter(Boolean);
 };
 
-const normalizeNameToken = (token) => token.replace(/^[,;]+|[,;]+$/g, "");
+const normalizeNameToken = (token) => token
+  .replace(/^[,;]+|[,;]+$/g, "")
+  .replace(/\s*\([^)]*\)\s*/g, "")
+  .trim();
 
 const isInitialToken = (token) => /^[A-Z]\.$/.test(token);
 
@@ -460,11 +464,18 @@ const inferNameListFromBlob = (value) => {
   return best[0]?.names || [normalizeMetadataText(value)];
 };
 
+const cleanPersonName = (name) => normalizeMetadataText(name)
+  .replace(/\s*\([^)]*\)\s*/g, " ")
+  .replace(/\b(actor|actress|voice actor|sound effects artist|animator|composer|writer|director)\b/gi, " ")
+  .replace(/[;,]+$/g, "")
+  .replace(/\s+/g, " ")
+  .trim();
+
 const dedupeNames = (names) => {
   const seen = new Set();
 
-  return names.filter((name) => {
-    const key = name
+  return names.map(cleanPersonName).filter((name) => {
+    const key = cleanPersonName(name)
       .replace(/\s*\([^)]*\)/g, "")
       .replace(/[^\p{L}\p{N}'’. -]/gu, "")
       .replace(/\s+/g, " ")
@@ -481,17 +492,21 @@ const dedupeNames = (names) => {
 };
 
 const formatStarringDisplay = (value) => {
+  return parseStarringNames(value).join(", ");
+};
+
+const parseStarringNames = (value) => {
   const normalized = normalizeMetadataText(value);
 
   if (!normalized) {
-    return "";
+    return [];
   }
 
   const names = normalized.includes(",")
     ? normalized.split(",").map((name) => name.trim()).filter(Boolean)
     : inferNameListFromBlob(normalized);
 
-  return dedupeNames(names).join(", ");
+  return dedupeNames(names);
 };
 
 const getTagSearchText = (record) => [
@@ -566,6 +581,35 @@ const getAllMovieTags = (movie) => {
     ...(movie.personalTags || []),
     ...getMovieStatusTags(movie)
   ];
+};
+
+const normalizeSearchValue = (value) => String(value || "")
+  .toLowerCase()
+  .replace(/\s+/g, " ")
+  .trim();
+
+const getMovieSearchText = (movie) => {
+  const tagLabels = getAllMovieTags(movie)
+    .map((tagId) => TAG_LABELS.get(tagId) || tagId.replace(/^[^:]+:/, ""))
+    .join(" ");
+
+  return normalizeSearchValue([
+    movie.title,
+    movie.distributor,
+    movie.studio,
+    formatStarringDisplay(movie.starring),
+    tagLabels
+  ].filter(Boolean).join(" "));
+};
+
+const movieMatchesSearchQuery = (movie) => {
+  const query = normalizeSearchValue(appState.searchQuery);
+
+  if (!query) {
+    return true;
+  }
+
+  return getMovieSearchText(movie).includes(query);
 };
 
 const movieMatchesActiveFilters = (movie) => {
@@ -969,12 +1013,23 @@ const setupCardDisplayControls = () => {
 
 const getFilterElements = () => {
   return {
-    toggleButton: document.getElementById("filter-toggle-button"),
+    toggleButton: document.getElementById("search-toggle-button"),
     panel: document.getElementById("filter-panel"),
     groups: document.getElementById("filter-groups"),
     summary: document.getElementById("filter-summary"),
     clearButton: document.getElementById("filter-clear-button"),
     emptyState: document.getElementById("filter-empty-state")
+  };
+};
+
+const getSearchElements = () => {
+  return {
+    toggleButton: document.getElementById("search-toggle-button"),
+    panel: document.getElementById("filter-panel"),
+    input: document.getElementById("movie-search-input"),
+    suggestions: document.getElementById("search-suggestions"),
+    summary: document.getElementById("filter-summary"),
+    clearButton: document.getElementById("filter-clear-button")
   };
 };
 
@@ -992,7 +1047,7 @@ const getFilterResultCounts = () => {
 
 const syncFilterButtonState = () => {
   const { toggleButton } = getFilterElements();
-  const hasFilters = appState.activeFilters.size > 0;
+  const hasFilters = hasActiveGridQuery();
 
   if (!(toggleButton instanceof HTMLButtonElement)) {
     return;
@@ -1002,9 +1057,13 @@ const syncFilterButtonState = () => {
   toggleButton.setAttribute("aria-pressed", String(hasFilters));
 };
 
+const hasActiveSearch = () => normalizeSearchValue(appState.searchQuery).length > 0;
+
+const hasActiveGridQuery = () => appState.activeFilters.size > 0 || hasActiveSearch();
+
 const syncFilterPanelState = () => {
   const { groups, summary, clearButton, emptyState } = getFilterElements();
-  const hasFilters = appState.activeFilters.size > 0;
+  const hasQuery = hasActiveGridQuery();
   const counts = getFilterResultCounts();
 
   groups?.querySelectorAll(".filter-chip").forEach((chip) => {
@@ -1018,20 +1077,35 @@ const syncFilterPanelState = () => {
   });
 
   if (summary) {
-    summary.textContent = hasFilters
+    summary.textContent = hasQuery
       ? `Showing ${counts.visible} of ${counts.total} movies`
       : "Showing all movies";
   }
 
   if (clearButton) {
-    clearButton.hidden = !hasFilters;
+    clearButton.hidden = !hasQuery;
   }
 
   if (emptyState) {
-    emptyState.hidden = !hasFilters || counts.visible > 0;
+    emptyState.hidden = !hasQuery || counts.visible > 0;
   }
 
   syncFilterButtonState();
+};
+
+const syncSearchPanelState = () => {
+  const { toggleButton, input } = getSearchElements();
+  const hasSearch = hasActiveSearch();
+  const hasQuery = hasActiveGridQuery();
+
+  if (toggleButton instanceof HTMLButtonElement) {
+    toggleButton.classList.toggle("is-active", hasQuery);
+    toggleButton.setAttribute("aria-pressed", String(hasQuery));
+  }
+
+  if (input instanceof HTMLInputElement && input.value !== appState.searchQuery) {
+    input.value = appState.searchQuery;
+  }
 };
 
 const updateAllYearProgress = () => {
@@ -1043,21 +1117,23 @@ const updateAllYearProgress = () => {
 };
 
 const applyMovieFilters = () => {
-  const hasFilters = appState.activeFilters.size > 0;
+  const hasQuery = hasActiveGridQuery();
 
   document.querySelectorAll(".year-row").forEach((row) => {
     const cards = Array.from(row.querySelectorAll(".movie-card"));
 
     cards.forEach((card) => {
-      const isVisible = !hasFilters || movieMatchesActiveFilters(card.movieData);
+      const isVisible =
+        (!card.movieData || (movieMatchesActiveFilters(card.movieData) && movieMatchesSearchQuery(card.movieData)));
       card.classList.toggle("is-filtered-out", !isVisible);
     });
 
-    row.hidden = hasFilters && !cards.some((card) => !card.classList.contains("is-filtered-out"));
+    row.hidden = hasQuery && !cards.some((card) => !card.classList.contains("is-filtered-out"));
   });
 
   updateAllYearProgress();
   syncFilterPanelState();
+  syncSearchPanelState();
 };
 
 const buildFilterChip = (tag) => {
@@ -1082,13 +1158,9 @@ const buildFilterChip = (tag) => {
 };
 
 const setupFilterPanel = () => {
-  const { toggleButton, panel, groups, clearButton } = getFilterElements();
+  const { groups, clearButton } = getFilterElements();
 
-  if (
-    !(toggleButton instanceof HTMLButtonElement) ||
-    !(panel instanceof HTMLElement) ||
-    !(groups instanceof HTMLElement)
-  ) {
+  if (!(groups instanceof HTMLElement)) {
     return;
   }
 
@@ -1114,18 +1186,147 @@ const setupFilterPanel = () => {
     groups.append(groupElement);
   });
 
+  clearButton?.addEventListener("click", () => {
+    appState.activeFilters.clear();
+    setSearchQuery("");
+  });
+
+  syncFilterPanelState();
+};
+
+const setSearchQuery = (value, options = {}) => {
+  const { openPanel = false, focusInput = false } = options;
+  const { panel, toggleButton, input } = getSearchElements();
+
+  appState.searchQuery = String(value || "").trim();
+
+  if (panel && openPanel) {
+    panel.hidden = false;
+    toggleButton?.setAttribute("aria-expanded", "true");
+  }
+
+  applyMovieFilters();
+
+  if (input instanceof HTMLInputElement) {
+    input.value = appState.searchQuery;
+
+    if (focusInput) {
+      input.focus();
+      input.select();
+    }
+  }
+};
+
+const getSearchSuggestionValues = () => {
+  const suggestions = new Map();
+
+  const addSuggestion = (value, priority = 4) => {
+    const label = String(value || "").trim();
+
+    if (!label) {
+      return;
+    }
+
+    const key = normalizeSearchValue(label);
+    const existing = suggestions.get(key);
+
+    if (!existing || priority < existing.priority) {
+      suggestions.set(key, { label, priority });
+    }
+  };
+
+  getMovieCards().forEach((card) => {
+    const movie = card.movieData;
+
+    if (!movie) {
+      return;
+    }
+
+    addSuggestion(movie.title, 1);
+    addSuggestion(movie.studio, 2);
+    addSuggestion(movie.distributor, 2);
+    parseStarringNames(movie.starring).forEach((name) => {
+      addSuggestion(name, 3);
+    });
+  });
+
+  FILTER_GROUPS.forEach((group) => {
+    group.tags.forEach((tag) => {
+      addSuggestion(tag.label, 4);
+    });
+  });
+
+  return Array.from(suggestions.values())
+    .sort((left, right) =>
+      left.priority - right.priority ||
+      left.label.localeCompare(right.label)
+    )
+    .map((suggestion) => suggestion.label);
+};
+
+const updateSearchSuggestions = () => {
+  const { suggestions } = getSearchElements();
+
+  if (!(suggestions instanceof HTMLDataListElement)) {
+    return;
+  }
+
+  suggestions.replaceChildren();
+
+  getSearchSuggestionValues().slice(0, 160).forEach((value) => {
+    const option = document.createElement("option");
+    option.value = value;
+    suggestions.append(option);
+  });
+};
+
+const setupSearchPanel = () => {
+  const { toggleButton, panel, input, clearButton } = getSearchElements();
+
+  if (
+    !(toggleButton instanceof HTMLButtonElement) ||
+    !(panel instanceof HTMLElement) ||
+    !(input instanceof HTMLInputElement)
+  ) {
+    return;
+  }
+
   toggleButton.addEventListener("click", () => {
     const isOpen = panel.hidden;
     panel.hidden = !isOpen;
     toggleButton.setAttribute("aria-expanded", String(isOpen));
+
+    if (isOpen) {
+      window.requestAnimationFrame(() => {
+        input.focus();
+      });
+    }
+  });
+
+  input.addEventListener("input", () => {
+    setSearchQuery(input.value);
+  });
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") {
+      return;
+    }
+
+    if (input.value) {
+      setSearchQuery("", { focusInput: true });
+      return;
+    }
+
+    panel.hidden = true;
+    toggleButton.setAttribute("aria-expanded", "false");
+    toggleButton.focus();
   });
 
   clearButton?.addEventListener("click", () => {
-    appState.activeFilters.clear();
-    applyMovieFilters();
+    setSearchQuery("", { focusInput: true });
   });
 
-  syncFilterPanelState();
+  syncSearchPanelState();
 };
 
 const createMovieCard = (movie) => {
@@ -1248,6 +1449,21 @@ const setLinkState = (link, href) => {
   link.hidden = true;
 };
 
+const buildSearchShortcutButton = (label, className) => {
+  const button = document.createElement("button");
+  button.className = className;
+  button.type = "button";
+  button.textContent = label;
+  button.setAttribute("aria-label", `Search for ${label}`);
+
+  button.addEventListener("click", () => {
+    closeMovieDetail();
+    setSearchQuery(label, { openPanel: true, focusInput: true });
+  });
+
+  return button;
+};
+
 const paintDetailMovieInfo = (movie) => {
   const detail = getDetailElements();
 
@@ -1276,7 +1492,16 @@ const paintDetailMovieInfo = (movie) => {
   }
 
   if (detail.distributor) {
-    detail.distributor.textContent = movie.distributor || "Distributor not listed";
+    const studioSearchValue = movie.studio || movie.distributor || "";
+    detail.distributor.textContent = studioSearchValue || "Studio not listed";
+    detail.distributor.disabled = !studioSearchValue;
+    detail.distributor.dataset.searchValue = studioSearchValue;
+    detail.distributor.setAttribute(
+      "aria-label",
+      studioSearchValue
+        ? `Search for movies from ${studioSearchValue}`
+        : "Studio not listed"
+    );
   }
 
   if (detail.director) {
@@ -1284,7 +1509,21 @@ const paintDetailMovieInfo = (movie) => {
   }
 
   if (detail.starring) {
-    detail.starring.textContent = formatStarringDisplay(movie.starring) || "Cast not listed";
+    const starringNames = parseStarringNames(movie.starring);
+    detail.starring.replaceChildren();
+
+    if (starringNames.length === 0) {
+      detail.starring.textContent = "Cast not listed";
+    } else {
+      const castList = document.createElement("span");
+      castList.className = "movie-detail-cast-list";
+
+      starringNames.slice(0, 8).forEach((name) => {
+        castList.append(buildSearchShortcutButton(name, "movie-detail-cast-button"));
+      });
+
+      detail.starring.append(castList);
+    }
   }
 
   if (detail.runtime) {
@@ -1386,7 +1625,8 @@ const getEligibleRandomMovies = () => {
     .filter((movie) =>
       movie?.sourceType === "database" &&
       !movie.watched &&
-      movieMatchesActiveFilters(movie)
+      movieMatchesActiveFilters(movie) &&
+      movieMatchesSearchQuery(movie)
     );
 };
 
@@ -1785,6 +2025,8 @@ const resetMovieDetail = () => {
 
   if (detail.distributor) {
     detail.distributor.textContent = "";
+    detail.distributor.disabled = true;
+    delete detail.distributor.dataset.searchValue;
   }
 
   if (detail.director) {
@@ -1851,6 +2093,17 @@ const setupMovieDetailOverlay = () => {
 
   detail.closeButton.addEventListener("click", () => {
     closeMovieDetail();
+  });
+
+  detail.distributor?.addEventListener("click", () => {
+    const searchValue = detail.distributor?.dataset.searchValue || "";
+
+    if (!searchValue) {
+      return;
+    }
+
+    closeMovieDetail();
+    setSearchQuery(searchValue, { openPanel: true, focusInput: true });
   });
 
   detail.favoriteButton?.addEventListener("click", async () => {
@@ -2395,6 +2648,7 @@ const renderYearRows = async () => {
 
     applyCardDisplayState(container);
     applyMovieFilters();
+    updateSearchSuggestions();
 
     const expandAllButton = document.getElementById("expand-all-button");
     const expandNoneButton = document.getElementById("expand-none-button");
@@ -2425,6 +2679,7 @@ window.addEventListener("load", () => {
   setupRandomPickerOverlay();
   setupCardDisplayControls();
   setupFilterPanel();
+  setupSearchPanel();
   setupDecadeScroller();
   renderYearRows();
   registerServiceWorker();

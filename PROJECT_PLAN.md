@@ -84,7 +84,7 @@ Then build up the movie features one step at a time.
 
 ## Current Checkpoint
 
-The app has moved beyond the initial shell and now includes a functioning browse experience for the full 1950s movie grid, an animated random-pick workflow, and the first tag-based filtering foundation.
+The app has moved beyond the initial shell and now includes a functioning browse experience for the full 1950s movie grid, an animated random-pick workflow, and a combined search/filter foundation.
 
 Implemented so far:
 
@@ -99,20 +99,21 @@ Implemented so far:
 - Responsive decade navigation that expands when space allows and scrolls when it does not
 - Random top-bar action wired to an animated ticket-printer picker for unwatched movies
 - Revealed random tickets can be pressed again to cut away the ticket stub, animate the cover back to its grid card, and open the full detail card
-- Filter top-bar action opens a tag panel with status, genre, runtime, and metadata-derived chips
+- Search top-bar action opens a combined search and filter panel with title/studio/tag search plus status, genre, runtime, and metadata-derived chips
+- Studio/distributor names in movie detail cards can be clicked to search for related movies
+- Cast names in movie detail cards are cleaned into clickable search shortcuts
 - Movie detail cards show normalized tags derived from the catalog metadata
-- Top-bar action button reserved for search
 - Real movie coverage for 1950 through 1959 with imported poster art
 - Metadata-backed catalog import for the 1950s dataset
 - Tied-rank handling using a stable internal sequence separate from displayed rank
 
 ## Ready For Next Step
 
-The current tag/filter checkpoint should be committed as a milestone before the next feature pass.
+The current combined search/filter checkpoint should be committed as a milestone before the next feature pass.
 
 Most likely next work areas:
 
-- Hook the top-bar search button to real behavior
+- Refine combined search/filter behavior after device testing, including whether suggestions should become a custom autocomplete list
 - Add editable personal tags on movie detail cards
 - Add sorting options that can use tag, status, rating, and metadata fields
 - Tune the random ticket handoff timing after device testing

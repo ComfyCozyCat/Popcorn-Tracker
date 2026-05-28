@@ -1,4 +1,4 @@
-const CACHE_NAME = "popcorn-archive-v24";
+const CACHE_NAME = "popcorn-archive-v26";
 const APP_SHELL = [
   "./",
   "index.html",
@@ -11,7 +11,6 @@ const APP_SHELL = [
   "assets/icons/dice.svg",
   "assets/icons/expand-all.svg",
   "assets/icons/expand-none.svg",
-  "assets/icons/filter.svg",
   "assets/icons/imdb-svgrepo-com.svg",
   "assets/icons/popcorn-movie-cinema-svgrepo-com.svg",
   "assets/icons/ribbon.svg",

@@ -398,9 +398,47 @@ img {
   padding: 7px 13px;
 }
 
+.search-field {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.search-field span {
+  color: rgba(255, 247, 232, 0.78);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.search-field input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid rgba(243, 192, 79, 0.22);
+  border-radius: 10px;
+  background: rgba(15, 11, 10, 0.68);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  padding: 11px 13px;
+}
+
+.search-field input::placeholder {
+  color: rgba(185, 169, 158, 0.72);
+}
+
+.search-field input:focus {
+  border-color: rgba(243, 192, 79, 0.54);
+  outline: 2px solid rgba(243, 192, 79, 0.16);
+  outline-offset: 2px;
+}
+
 .filter-groups {
   display: grid;
   gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 247, 232, 0.09);
 }
 
 .filter-group {
@@ -1121,10 +1159,30 @@ img {
 }
 
 .movie-detail-distributor {
+  appearance: none;
   margin: 0;
+  border: 0;
+  background: transparent;
   color: rgba(255, 247, 232, 0.76);
+  cursor: pointer;
   font-size: 0.98rem;
   line-height: 1.6;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: rgba(243, 192, 79, 0.3);
+  text-underline-offset: 4px;
+}
+
+.movie-detail-distributor:hover,
+.movie-detail-distributor:focus-visible {
+  color: #fff0d4;
+  text-decoration-color: rgba(243, 192, 79, 0.72);
+}
+
+.movie-detail-distributor:disabled {
+  cursor: default;
+  text-decoration: none;
 }
 
 .movie-detail-facts {
@@ -1162,6 +1220,32 @@ img {
   color: var(--text);
   font-size: 1rem;
   font-weight: 700;
+}
+
+.movie-detail-cast-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.movie-detail-cast-button {
+  appearance: none;
+  min-height: 30px;
+  border: 1px solid rgba(243, 192, 79, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 247, 232, 0.06);
+  color: rgba(255, 247, 232, 0.88);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 760;
+  padding: 5px 10px;
+}
+
+.movie-detail-cast-button:hover,
+.movie-detail-cast-button:focus-visible {
+  border-color: rgba(243, 192, 79, 0.42);
+  color: #fff0d4;
 }
 
 .movie-detail-tags {

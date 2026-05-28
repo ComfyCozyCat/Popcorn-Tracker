@@ -1,17 +1,19 @@
-const CACHE_NAME = "popcorn-archive-v12";
+const CACHE_NAME = "popcorn-archive-v22";
 const APP_SHELL = [
   "./",
   "index.html",
   "styles.css",
   "app.js",
   "manifest.json",
-  "assets/top_movies_catalog_new.csv",
+  "assets/top_movies_catalog_with_metadata.csv",
   "assets/icons/bookmark.svg",
   "assets/icons/calendar.svg",
   "assets/icons/dice.svg",
   "assets/icons/expand-all.svg",
   "assets/icons/expand-none.svg",
   "assets/icons/filter.svg",
+  "assets/icons/imdb-svgrepo-com.svg",
+  "assets/icons/popcorn-movie-cinema-svgrepo-com.svg",
   "assets/icons/ribbon.svg",
   "assets/icons/star-empty.svg",
   "assets/icons/star-filled.svg",

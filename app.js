@@ -46,12 +46,13 @@ const TITLE_PARTS = {
 };
 
 const DB_NAME = "popcorn-archive-db";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const MOVIES_STORE = "movies";
 const YEAR_COUNT = 10;
 const MOVIES_PER_YEAR = 10;
 const CARD_DISPLAY_SETTINGS_KEY = "popcorn-archive-card-display";
-const CATALOG_PATH = "assets/top_movies_catalog_new.csv";
+const CATALOG_PATH = "assets/top_movies_catalog_with_metadata.csv";
+const RANDOM_PICKER_PRINT_DURATION = 4200;
 const SENTIMENT = {
   UP: "up",
   DOWN: "down"
@@ -97,7 +98,11 @@ const saveCardDisplaySettings = (settings) => {
 const appState = {
   activeMovie: null,
   lastTrigger: null,
-  cardDisplay: loadCardDisplaySettings()
+  cardDisplay: loadCardDisplaySettings(),
+  randomPickerMovie: null,
+  randomPickerTimer: null,
+  randomPickerReady: false,
+  randomPickerRevealed: false
 };
 
 const registerServiceWorker = async () => {
@@ -268,6 +273,168 @@ const parseCsv = (csvText) => {
   });
 };
 
+const normalizeMetadataText = (value) => {
+  return (value || "")
+    .replace(/^Plain list,\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const NAME_PARTICLES = new Set([
+  "da",
+  "de",
+  "del",
+  "der",
+  "di",
+  "du",
+  "la",
+  "le",
+  "van",
+  "von"
+]);
+
+const tokenizeNameBlob = (value) => {
+  return normalizeMetadataText(value)
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+};
+
+const normalizeNameToken = (token) => token.replace(/^[,;]+|[,;]+$/g, "");
+
+const isInitialToken = (token) => /^[A-Z]\.$/.test(token);
+
+const isParentheticalToken = (token) => /^\(.*\)$/.test(token);
+
+const isNameParticle = (token) => NAME_PARTICLES.has(token.toLowerCase());
+
+const isLikelyNameToken = (token) => {
+  if (!token) {
+    return false;
+  }
+
+  if (isInitialToken(token) || isParentheticalToken(token) || isNameParticle(token)) {
+    return true;
+  }
+
+  return /^[A-ZÀ-ÖØ-Ý][A-Za-zÀ-ÖØ-öø-ÿ'’.:-]*$/.test(token);
+};
+
+const scoreNameParts = (parts, isTerminal) => {
+  const normalizedParts = parts.map(normalizeNameToken);
+
+  if (!normalizedParts.every(isLikelyNameToken)) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const coreParts = normalizedParts.filter(
+    (part) => !isInitialToken(part) && !isParentheticalToken(part) && !isNameParticle(part)
+  );
+
+  if (coreParts.length === 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  if (normalizedParts.length === 1) {
+    return isTerminal ? 0.2 : 4;
+  }
+
+  if (normalizedParts.length === 2) {
+    return 0;
+  }
+
+  if (normalizedParts.length === 3) {
+    return normalizedParts.some((part) => isInitialToken(part) || isNameParticle(part))
+      ? 0.35
+      : 0.75;
+  }
+
+  if (normalizedParts.length === 4) {
+    return normalizedParts.some((part) => isInitialToken(part) || isNameParticle(part))
+      ? 0.85
+      : 1.7;
+  }
+
+  return Number.POSITIVE_INFINITY;
+};
+
+const inferNameListFromBlob = (value) => {
+  const tokens = tokenizeNameBlob(value);
+
+  if (tokens.length <= 1) {
+    return tokens;
+  }
+
+  const best = new Array(tokens.length + 1).fill(null);
+  best[tokens.length] = { score: 0, names: [] };
+
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    let bestOption = null;
+
+    for (let size = 1; size <= 4 && index + size <= tokens.length; size += 1) {
+      const parts = tokens.slice(index, index + size);
+      const tail = best[index + size];
+
+      if (!tail) {
+        continue;
+      }
+
+      const score = scoreNameParts(parts, index + size === tokens.length);
+
+      if (!Number.isFinite(score)) {
+        continue;
+      }
+
+      const option = {
+        score: score + tail.score,
+        names: [parts.map(normalizeNameToken).join(" "), ...tail.names]
+      };
+
+      if (!bestOption || option.score < bestOption.score) {
+        bestOption = option;
+      }
+    }
+
+    best[index] = bestOption;
+  }
+
+  return best[0]?.names || [normalizeMetadataText(value)];
+};
+
+const dedupeNames = (names) => {
+  const seen = new Set();
+
+  return names.filter((name) => {
+    const key = name
+      .replace(/\s*\([^)]*\)/g, "")
+      .replace(/[^\p{L}\p{N}'’. -]/gu, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+
+    if (!key || seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+};
+
+const formatStarringDisplay = (value) => {
+  const normalized = normalizeMetadataText(value);
+
+  if (!normalized) {
+    return "";
+  }
+
+  const names = normalized.includes(",")
+    ? normalized.split(",").map((name) => name.trim()).filter(Boolean)
+    : inferNameListFromBlob(normalized);
+
+  return dedupeNames(names).join(", ");
+};
+
 const normalizeMovieRecord = (record, sequence) => {
   const year = Number.parseInt(record.year, 10);
   const displayRank = Number.parseInt(record.rank, 10);
@@ -294,6 +461,35 @@ const normalizeMovieRecord = (record, sequence) => {
     posterFilePageUrl: record.poster_file_page_url,
     localPosterPath: record.local_poster_path ? `assets/${record.local_poster_path}` : "",
     csvLastUpdated: record.last_updated,
+    metadataStatus: record.metadata_status,
+    metadataError: record.metadata_error,
+    metadataLastUpdated: record.metadata_last_updated,
+    wikipediaPageTitle: record.wikipedia_page_title,
+    wikipediaDisplayTitle: record.wikipedia_display_title,
+    wikipediaUrl: record.wikipedia_url,
+    director: record.director,
+    producer: record.producer,
+    writer: record.writer,
+    basedOn: record.based_on,
+    starring: record.starring,
+    musicBy: record.music_by,
+    cinematography: record.cinematography,
+    editing: record.editing,
+    studio: record.studio,
+    releaseDate: record.release_date,
+    runtime: record.runtime,
+    country: record.country,
+    language: record.language,
+    budget: record.budget,
+    boxOffice: record.box_office,
+    imdbRating: record.imdb_rating,
+    imdbRatingCount: record.imdb_rating_count,
+    imdbUrl: record.imdb_url,
+    rottenTomatoesScore: record.rotten_tomatoes_score,
+    rottenTomatoesReviewCount: record.rotten_tomatoes_review_count,
+    rottenTomatoesAverageRating: record.rotten_tomatoes_average_rating,
+    rottenTomatoesUrl: record.rottentomatoes_url,
+    wikipediaTags: record.wikipedia_tags,
     watched: false,
     watchlist: false,
     favorite: false,
@@ -435,6 +631,35 @@ const mapDatabaseMovieToCard = (movie) => {
     sourceType: "database",
     rentalDisplay: movie.rentalDisplay || "Unknown",
     filmWikipediaUrl: movie.filmWikipediaUrl || "",
+    wikipediaUrl: movie.wikipediaUrl || "",
+    director: movie.director || "",
+    producer: movie.producer || "",
+    writer: movie.writer || "",
+    basedOn: movie.basedOn || "",
+    starring: movie.starring || "",
+    musicBy: movie.musicBy || "",
+    cinematography: movie.cinematography || "",
+    editing: movie.editing || "",
+    studio: movie.studio || "",
+    releaseDate: movie.releaseDate || "",
+    runtime: movie.runtime || "",
+    country: movie.country || "",
+    language: movie.language || "",
+    budget: movie.budget || "",
+    boxOffice: movie.boxOffice || "",
+    imdbRating: movie.imdbRating || "",
+    imdbRatingCount: movie.imdbRatingCount || "",
+    imdbUrl: movie.imdbUrl || "",
+    rottenTomatoesScore: movie.rottenTomatoesScore || "",
+    rottenTomatoesReviewCount: movie.rottenTomatoesReviewCount || "",
+    rottenTomatoesAverageRating: movie.rottenTomatoesAverageRating || "",
+    rottenTomatoesUrl: movie.rottenTomatoesUrl || "",
+    wikipediaTags: movie.wikipediaTags || "",
+    metadataStatus: movie.metadataStatus || "",
+    metadataError: movie.metadataError || "",
+    metadataLastUpdated: movie.metadataLastUpdated || "",
+    wikipediaPageTitle: movie.wikipediaPageTitle || "",
+    wikipediaDisplayTitle: movie.wikipediaDisplayTitle || "",
     sourcePageUrl: movie.sourcePageUrl || "",
     notes: movie.notes || "",
     sourceTable: movie.sourceTable || "",
@@ -683,12 +908,13 @@ const getDetailElements = () => {
     poster: document.getElementById("movie-detail-poster"),
     kicker: document.getElementById("movie-detail-kicker"),
     title: document.getElementById("movie-detail-title"),
+    titleRank: document.getElementById("movie-detail-rank"),
     distributor: document.getElementById("movie-detail-distributor"),
-    rank: document.getElementById("movie-detail-rank"),
-    rental: document.getElementById("movie-detail-rental"),
-    status: document.getElementById("movie-detail-status"),
-    rating: document.getElementById("movie-detail-rating"),
+    director: document.getElementById("movie-detail-director"),
+    starring: document.getElementById("movie-detail-starring"),
+    runtime: document.getElementById("movie-detail-runtime"),
     filmLink: document.getElementById("movie-detail-film-link"),
+    imdbLink: document.getElementById("movie-detail-imdb-link"),
     favoriteButton: document.getElementById("movie-detail-favorite"),
     likeButton: document.getElementById("movie-detail-like"),
     dislikeButton: document.getElementById("movie-detail-dislike"),
@@ -726,37 +952,36 @@ const paintDetailMovieInfo = (movie) => {
   if (detail.kicker) {
     detail.kicker.textContent =
       movie.sourceType === "temporary"
-        ? `${movie.year} placeholder card`
-        : `${movie.year} theatrical release`;
+        ? `#${movie.rank} - ${movie.year} placeholder card`
+        : `#${movie.rank} - ${movie.year} theatrical release`;
   }
 
   if (detail.title) {
     detail.title.textContent = movie.title;
   }
 
+  if (detail.titleRank) {
+    detail.titleRank.textContent = "";
+  }
+
   if (detail.distributor) {
     detail.distributor.textContent = movie.distributor || "Distributor not listed";
   }
 
-  if (detail.rank) {
-    detail.rank.textContent = `#${movie.rank}`;
+  if (detail.director) {
+    detail.director.textContent = movie.director || "Director not listed";
   }
 
-  if (detail.rental) {
-    detail.rental.textContent = movie.rentalDisplay || "Unknown";
+  if (detail.starring) {
+    detail.starring.textContent = formatStarringDisplay(movie.starring) || "Cast not listed";
   }
 
-  if (detail.status) {
-    detail.status.textContent = movie.watched ? "Watched" : "Not watched yet";
-  }
-
-  if (detail.rating) {
-    detail.rating.textContent = movie.personalRating
-      ? `${movie.personalRating}/5 stars`
-      : "Not rated";
+  if (detail.runtime) {
+    detail.runtime.textContent = movie.runtime || "Runtime not listed";
   }
 
   setLinkState(detail.filmLink, movie.filmWikipediaUrl);
+  setLinkState(detail.imdbLink, movie.imdbUrl);
 };
 
 const paintDetailActions = (movie) => {
@@ -810,6 +1035,219 @@ const openMovieDetail = (movie, trigger) => {
   });
 };
 
+const getRandomPickerElements = () => {
+  return {
+    trigger: document.getElementById("random-movie-button"),
+    overlay: document.getElementById("random-picker-overlay"),
+    card: document.getElementById("random-picker-card"),
+    closeButton: document.getElementById("random-picker-close"),
+    message: document.getElementById("random-picker-message"),
+    ticket: document.getElementById("random-picker-ticket"),
+    ticketCoverImage: document.getElementById("random-picker-ticket-cover-image"),
+    ticketCoverMystery: document.getElementById("random-picker-ticket-cover-mystery"),
+    ticketKicker: document.getElementById("random-picker-ticket-kicker"),
+    ticketTitle: document.getElementById("random-picker-ticket-title"),
+    ticketMeta: document.getElementById("random-picker-ticket-meta"),
+    ticketDetail: document.getElementById("random-picker-ticket-detail")
+  };
+};
+
+const getEligibleRandomMovies = () => {
+  const movieCards = Array.from(document.querySelectorAll(".movie-card"));
+
+  return movieCards
+    .map((card) => card.movieData)
+    .filter((movie) => movie?.sourceType === "database" && !movie.watched);
+};
+
+const pickRandomMovie = (movies) => {
+  if (movies.length === 0) {
+    return null;
+  }
+
+  const index = Math.floor(Math.random() * movies.length);
+  return movies[index];
+};
+
+const resetRandomPickerTicket = () => {
+  const randomPicker = getRandomPickerElements();
+
+  if (!(randomPicker.ticket instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  appState.randomPickerReady = false;
+  appState.randomPickerRevealed = false;
+  randomPicker.ticket.disabled = true;
+  randomPicker.ticket.classList.remove("is-printing", "is-ready", "is-revealed", "is-empty");
+  randomPicker.ticket.setAttribute("aria-label", "Reveal random movie ticket");
+
+  if (randomPicker.ticketKicker) {
+    randomPicker.ticketKicker.textContent = "RANDOM PICK";
+  }
+
+  if (randomPicker.ticketCoverImage) {
+    randomPicker.ticketCoverImage.hidden = true;
+    randomPicker.ticketCoverImage.removeAttribute("src");
+    randomPicker.ticketCoverImage.alt = "";
+  }
+
+  if (randomPicker.ticketCoverMystery) {
+    randomPicker.ticketCoverMystery.hidden = false;
+  }
+
+  if (randomPicker.ticketTitle) {
+    randomPicker.ticketTitle.textContent = "Printing your ticket...";
+  }
+
+  if (randomPicker.ticketMeta) {
+    randomPicker.ticketMeta.textContent = "Hold tight while the printer finds an unwatched movie.";
+  }
+
+  if (randomPicker.ticketDetail) {
+    randomPicker.ticketDetail.textContent = "";
+    randomPicker.ticketDetail.hidden = true;
+  }
+};
+
+const setRandomPickerMovie = (movie) => {
+  const randomPicker = getRandomPickerElements();
+
+  if (!movie || !(randomPicker.ticket instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const starringNames = formatStarringDisplay(movie.starring)
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean)
+  ;
+  const shortCastLine = starringNames.length > 2
+    ? `${starringNames.slice(0, 2).join(", ")}...`
+    : starringNames.join(", ");
+  const detailLine = shortCastLine || "";
+
+  if (randomPicker.ticketCoverImage) {
+    randomPicker.ticketCoverImage.src = movie.cover;
+    randomPicker.ticketCoverImage.alt = `${movie.title} poster`;
+    randomPicker.ticketCoverImage.hidden = false;
+  }
+
+  if (randomPicker.ticketCoverMystery) {
+    randomPicker.ticketCoverMystery.hidden = true;
+  }
+
+  if (randomPicker.ticketKicker) {
+    randomPicker.ticketKicker.textContent = `#${movie.rank} · ${movie.year}`;
+  }
+
+  if (randomPicker.ticketTitle) {
+    randomPicker.ticketTitle.textContent = movie.title;
+  }
+
+  if (randomPicker.ticketMeta) {
+    randomPicker.ticketMeta.textContent = movie.director
+      ? `Directed by ${movie.director}`
+      : (movie.distributor || "Unwatched movie pick");
+  }
+
+  if (randomPicker.ticketDetail) {
+    randomPicker.ticketDetail.textContent = detailLine;
+    randomPicker.ticketDetail.hidden = !detailLine;
+  }
+};
+
+const openRandomPicker = () => {
+  const randomPicker = getRandomPickerElements();
+
+  if (!randomPicker.overlay || !randomPicker.card) {
+    return;
+  }
+
+  if (appState.randomPickerTimer) {
+    window.clearTimeout(appState.randomPickerTimer);
+    appState.randomPickerTimer = null;
+  }
+
+  const movie = pickRandomMovie(getEligibleRandomMovies());
+  appState.randomPickerMovie = movie;
+  resetRandomPickerTicket();
+
+  if (randomPicker.message) {
+    randomPicker.message.textContent = movie
+      ? "Selecting a random new movie for you!"
+      : "You've watched every movie in the archive!";
+  }
+
+  if (!movie) {
+    randomPicker.ticket?.classList.add("is-empty", "is-ready", "is-revealed");
+
+    if (randomPicker.ticketKicker) {
+      randomPicker.ticketKicker.textContent = "ALL CAUGHT UP";
+    }
+
+    if (randomPicker.ticketTitle) {
+      randomPicker.ticketTitle.textContent = "No unwatched movies left";
+    }
+
+    if (randomPicker.ticketMeta) {
+      randomPicker.ticketMeta.textContent = "Mark a few favorites for later or clear a watched title to spin again.";
+    }
+
+    if (randomPicker.ticketDetail) {
+      randomPicker.ticketDetail.hidden = true;
+    }
+  }
+
+  randomPicker.overlay.hidden = false;
+  document.body.classList.add("detail-open");
+  window.requestAnimationFrame(() => {
+    randomPicker.card.focus();
+    if (!movie || !(randomPicker.ticket instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    randomPicker.ticket.classList.add("is-printing");
+    appState.randomPickerTimer = window.setTimeout(() => {
+      appState.randomPickerReady = true;
+      randomPicker.ticket.disabled = false;
+      randomPicker.ticket.classList.add("is-ready");
+      randomPicker.ticket.setAttribute("aria-label", `Reveal ${movie.title}`);
+      if (randomPicker.ticketTitle) {
+        randomPicker.ticketTitle.textContent = "Tap to reveal your movie";
+      }
+      if (randomPicker.ticketMeta) {
+        randomPicker.ticketMeta.textContent = "Your unwatched pick is ready at the edge of the printer.";
+      }
+      appState.randomPickerTimer = null;
+    }, RANDOM_PICKER_PRINT_DURATION);
+  });
+};
+
+const closeRandomPicker = () => {
+  const randomPicker = getRandomPickerElements();
+
+  if (!randomPicker.overlay || randomPicker.overlay.hidden) {
+    return;
+  }
+
+  if (appState.randomPickerTimer) {
+    window.clearTimeout(appState.randomPickerTimer);
+    appState.randomPickerTimer = null;
+  }
+
+  randomPicker.overlay.hidden = true;
+  document.body.classList.remove("detail-open");
+  appState.randomPickerMovie = null;
+  appState.randomPickerReady = false;
+  appState.randomPickerRevealed = false;
+  resetRandomPickerTicket();
+
+  if (randomPicker.trigger instanceof HTMLElement) {
+    randomPicker.trigger.focus();
+  }
+};
+
 const closeMovieDetail = () => {
   const detail = getDetailElements();
   const lastTrigger = appState.lastTrigger;
@@ -853,27 +1291,28 @@ const resetMovieDetail = () => {
     detail.title.textContent = "";
   }
 
+  if (detail.titleRank) {
+    detail.titleRank.textContent = "";
+  }
+
   if (detail.distributor) {
     detail.distributor.textContent = "";
   }
 
-  if (detail.rank) {
-    detail.rank.textContent = "";
+  if (detail.director) {
+    detail.director.textContent = "";
   }
 
-  if (detail.rental) {
-    detail.rental.textContent = "";
+  if (detail.starring) {
+    detail.starring.textContent = "";
   }
 
-  if (detail.status) {
-    detail.status.textContent = "";
-  }
-
-  if (detail.rating) {
-    detail.rating.textContent = "";
+  if (detail.runtime) {
+    detail.runtime.textContent = "";
   }
 
   setLinkState(detail.filmLink, "");
+  setLinkState(detail.imdbLink, "");
   paintDetailActions(null);
 };
 
@@ -971,6 +1410,61 @@ const setupMovieDetailOverlay = () => {
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       closeMovieDetail();
+    }
+  });
+};
+
+const setupRandomPickerOverlay = () => {
+  const randomPicker = getRandomPickerElements();
+
+  if (
+    !(randomPicker.trigger instanceof HTMLButtonElement) ||
+    !(randomPicker.overlay instanceof HTMLElement) ||
+    !(randomPicker.card instanceof HTMLElement) ||
+    !(randomPicker.closeButton instanceof HTMLButtonElement)
+  ) {
+    return;
+  }
+
+  randomPicker.overlay.hidden = true;
+
+  randomPicker.trigger.addEventListener("click", () => {
+    openRandomPicker();
+  });
+
+  randomPicker.ticket?.addEventListener("click", () => {
+    if (!appState.randomPickerReady || appState.randomPickerRevealed || !appState.randomPickerMovie) {
+      return;
+    }
+
+    appState.randomPickerRevealed = true;
+    randomPicker.ticket?.classList.add("is-revealed");
+    setRandomPickerMovie(appState.randomPickerMovie);
+
+    if (randomPicker.message) {
+      randomPicker.message.textContent = "Your unwatched pick is ready.";
+    }
+  });
+
+  randomPicker.overlay.addEventListener("click", (event) => {
+    const target = event.target;
+
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    if (target.dataset.closeRandomPicker === "true") {
+      closeRandomPicker();
+    }
+  });
+
+  randomPicker.closeButton.addEventListener("click", () => {
+    closeRandomPicker();
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeRandomPicker();
     }
   });
 };
@@ -1181,8 +1675,15 @@ const setupDecadeScroller = () => {
     return;
   }
 
+  const chipCount = track.querySelectorAll(".decade-chip").length;
+  const minimumExpandedChipWidth = 118;
+
   const syncDecadeLayout = () => {
-    const isScrollable = track.scrollWidth > track.clientWidth + 2;
+    const trackStyles = window.getComputedStyle(track);
+    const gap = Number.parseFloat(trackStyles.columnGap || trackStyles.gap || "0") || 0;
+    const requiredWidth = (chipCount * minimumExpandedChipWidth) + (Math.max(chipCount - 1, 0) * gap);
+    const isScrollable = track.clientWidth < requiredWidth;
+
     shell.classList.toggle("is-scrollable", isScrollable);
 
     if (!isScrollable) {
@@ -1210,8 +1711,12 @@ const setupDecadeScroller = () => {
   });
 
   window.addEventListener("resize", syncDecadeLayout);
+  window.addEventListener("load", syncDecadeLayout);
   enablePointerDragging(track);
   syncDecadeLayout();
+  window.requestAnimationFrame(() => {
+    syncDecadeLayout();
+  });
 };
 
 const setYearExpanded = (row, expanded) => {
@@ -1409,6 +1914,7 @@ const renderYearRows = async () => {
 
 window.addEventListener("load", () => {
   setupMovieDetailOverlay();
+  setupRandomPickerOverlay();
   setupCardDisplayControls();
   setupDecadeScroller();
   renderYearRows();

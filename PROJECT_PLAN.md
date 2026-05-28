@@ -84,29 +84,33 @@ Then build up the movie features one step at a time.
 
 ## Current Checkpoint
 
-The app has moved beyond the initial shell and now includes a functioning browse experience for the full 1950s movie grid.
+The app has moved beyond the initial shell and now includes a functioning browse experience for the full 1950s movie grid plus an early random-pick workflow.
 
 Implemented so far:
 
 - Year-by-year horizontal cover rows with expand/collapse controls
 - IndexedDB-backed movie records synced from the catalog CSV
 - Detail card overlay with responsive desktop and mobile layouts
+- Enriched movie metadata in the detail card, including director, cast, runtime, Wikipedia, and IMDb links
 - Favorite, thumbs up, thumbs down, and watch-later calendar actions in the detail card
 - Watched-state updates tied to thumbs selection with live year progress updates
 - Ticket-style stub treatment on grid cards with visibility toggles for title, studio, and ratings
 - Persistent `Show:` toolbar preferences saved in local storage
 - Responsive decade navigation that expands when space allows and scrolls when it does not
-- Top-bar action buttons for random, filter, and search
+- Random top-bar action wired to an animated ticket-printer picker for unwatched movies
+- Top-bar action buttons reserved for filter and search
 - Real movie coverage for 1950 through 1959 with imported poster art
+- Metadata-backed catalog import for the 1950s dataset
 - Tied-rank handling using a stable internal sequence separate from displayed rank
 
 ## Ready For Next Step
 
-The current UI checkpoint is committed as a milestone before the next feature pass.
+The current UI checkpoint should be committed as a milestone before the next feature pass.
 
 Most likely next work areas:
 
-- Hook the top-bar random and filter buttons to real behavior
+- Hook the top-bar filter and search buttons to real behavior
+- Decide whether the random ticket should open the full detail card after reveal
 - Add deeper filtering and search flows
 - Expand beyond the 1950s into additional decade datasets
 - Add richer editing inside the detail card

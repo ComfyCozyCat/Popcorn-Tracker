@@ -13,7 +13,7 @@
       <header class="top-bar" aria-label="Primary navigation">
         <a class="brand" href="index.html" aria-label="Popcorn Archive home">
           <span class="brand-mark" aria-hidden="true">
-            <span></span>
+            <img class="brand-mark-image" src="assets/icons/popcorn-movie-cinema-svgrepo-com.svg" alt="">
           </span>
           <span class="brand-copy">
             <span class="brand-name">Popcorn Archive</span>
@@ -22,7 +22,7 @@
         </a>
 
         <div class="top-bar-actions" aria-label="Search and filter controls">
-          <button class="icon-button" type="button" aria-label="Pick a random movie">
+          <button id="random-movie-button" class="icon-button" type="button" aria-label="Pick a random movie">
             <img class="icon-button-image icon-button-image-random" src="assets/icons/dice.svg" alt="" aria-hidden="true">
           </button>
           <button class="icon-button" type="button" aria-label="Filter movies">
@@ -139,25 +139,24 @@
 
           <div class="movie-detail-copy">
             <p id="movie-detail-kicker" class="movie-detail-kicker"></p>
-            <h2 id="movie-detail-title"></h2>
+            <h2 class="movie-detail-heading">
+              <span id="movie-detail-title"></span>
+              <span id="movie-detail-rank" class="movie-detail-rank"></span>
+            </h2>
             <p id="movie-detail-distributor" class="movie-detail-distributor"></p>
 
             <dl class="movie-detail-facts">
               <div>
-                <dt>Rank</dt>
-                <dd id="movie-detail-rank"></dd>
+                <dt>Director</dt>
+                <dd id="movie-detail-director"></dd>
               </div>
               <div>
-                <dt>Rental</dt>
-                <dd id="movie-detail-rental"></dd>
+                <dt>Starring</dt>
+                <dd id="movie-detail-starring"></dd>
               </div>
               <div>
-                <dt>Status</dt>
-                <dd id="movie-detail-status"></dd>
-              </div>
-              <div>
-                <dt>Rating</dt>
-                <dd id="movie-detail-rating"></dd>
+                <dt>Runtime</dt>
+                <dd id="movie-detail-runtime"></dd>
               </div>
             </dl>
 
@@ -167,6 +166,12 @@
                   <img src="assets/icons/wikipedia.svg" alt="">
                 </span>
                 <span>Wikipedia</span>
+              </a>
+              <a id="movie-detail-imdb-link" class="movie-detail-link movie-detail-link-imdb" href="" target="_blank" rel="noreferrer noopener">
+                <span class="movie-detail-link-icon movie-detail-link-icon-imdb" aria-hidden="true">
+                  <img src="assets/icons/imdb-svgrepo-com.svg" alt="">
+                </span>
+                <span>IMDb</span>
               </a>
             </div>
 
@@ -184,6 +189,69 @@
                 <img src="assets/icons/calendar.svg" alt="" aria-hidden="true">
               </button>
             </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="random-picker-overlay" class="random-picker-overlay" hidden>
+      <div class="random-picker-backdrop" data-close-random-picker="true"></div>
+      <section
+        id="random-picker-card"
+        class="random-picker-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="random-picker-message"
+        tabindex="-1"
+      >
+        <button
+          id="random-picker-close"
+          class="random-picker-close"
+          type="button"
+          aria-label="Close random picker"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M6 6 18 18"></path>
+            <path d="M18 6 6 18"></path>
+          </svg>
+        </button>
+
+        <div class="random-picker-layout">
+          <p id="random-picker-message" class="random-picker-message">
+            Selecting a random new movie for you!
+          </p>
+          <div class="random-picker-printer-zone">
+            <button
+              id="random-picker-ticket"
+              class="random-picker-ticket"
+              type="button"
+              aria-label="Reveal random movie ticket"
+              disabled
+            >
+              <span class="random-picker-ticket-cover">
+                <img id="random-picker-ticket-cover-image" class="random-picker-ticket-cover-image" src="" alt="" hidden>
+                <span id="random-picker-ticket-cover-mystery" class="random-picker-ticket-cover-mystery" aria-hidden="true">?</span>
+              </span>
+              <span class="random-picker-ticket-stub">
+                <span id="random-picker-ticket-kicker" class="random-picker-ticket-kicker">
+                  RANDOM PICK
+                </span>
+                <span id="random-picker-ticket-title" class="random-picker-ticket-title">
+                  Printing your ticket...
+                </span>
+                <span id="random-picker-ticket-meta" class="random-picker-ticket-meta">
+                  Hold tight while the printer finds an unwatched movie.
+                </span>
+                <span id="random-picker-ticket-detail" class="random-picker-ticket-detail"></span>
+              </span>
+              <span class="random-picker-ticket-corners" aria-hidden="true"></span>
+              <span class="random-picker-ticket-ridge" aria-hidden="true">
+                <span class="random-picker-ticket-ridge-dot"></span>
+                <span class="random-picker-ticket-ridge-dot"></span>
+                <span class="random-picker-ticket-ridge-dot"></span>
+              </span>
+            </button>
+            <div class="random-picker-printer" aria-hidden="true"></div>
           </div>
         </div>
       </section>

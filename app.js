@@ -102,7 +102,8 @@ const appState = {
   randomPickerMovie: null,
   randomPickerTimer: null,
   randomPickerReady: false,
-  randomPickerRevealed: false
+  randomPickerRevealed: false,
+  randomPickerChoosing: false
 };
 
 const registerServiceWorker = async () => {
@@ -1043,6 +1044,8 @@ const getRandomPickerElements = () => {
     closeButton: document.getElementById("random-picker-close"),
     message: document.getElementById("random-picker-message"),
     ticket: document.getElementById("random-picker-ticket"),
+    ticketCover: document.querySelector("#random-picker-ticket .random-picker-ticket-cover"),
+    ticketStub: document.querySelector("#random-picker-ticket .random-picker-ticket-stub"),
     ticketCoverImage: document.getElementById("random-picker-ticket-cover-image"),
     ticketCoverMystery: document.getElementById("random-picker-ticket-cover-mystery"),
     ticketKicker: document.getElementById("random-picker-ticket-kicker"),
@@ -1078,8 +1081,16 @@ const resetRandomPickerTicket = () => {
 
   appState.randomPickerReady = false;
   appState.randomPickerRevealed = false;
+  appState.randomPickerChoosing = false;
   randomPicker.ticket.disabled = true;
-  randomPicker.ticket.classList.remove("is-printing", "is-ready", "is-revealed", "is-empty");
+  randomPicker.ticket.classList.remove(
+    "is-printing",
+    "is-ready",
+    "is-revealed",
+    "is-empty",
+    "is-choosing",
+    "is-cut"
+  );
   randomPicker.ticket.setAttribute("aria-label", "Reveal random movie ticket");
 
   if (randomPicker.ticketKicker) {
@@ -1241,11 +1252,161 @@ const closeRandomPicker = () => {
   appState.randomPickerMovie = null;
   appState.randomPickerReady = false;
   appState.randomPickerRevealed = false;
+  appState.randomPickerChoosing = false;
   resetRandomPickerTicket();
 
   if (randomPicker.trigger instanceof HTMLElement) {
     randomPicker.trigger.focus();
   }
+};
+
+const findMovieCardById = (movieId) => {
+  return Array.from(document.querySelectorAll(".movie-card"))
+    .find((card) => card.movieData?.id === movieId) || null;
+};
+
+const showMovieCardDestination = (movie) => {
+  const card = findMovieCardById(movie.id);
+
+  if (!(card instanceof HTMLElement)) {
+    return null;
+  }
+
+  const row = card.closest(".year-row");
+  const track = card.closest(".movie-track");
+
+  if (row instanceof HTMLElement) {
+    setYearExpanded(row, true);
+  }
+
+  if (track instanceof HTMLElement) {
+    const targetLeft = card.offsetLeft - Math.max((track.clientWidth - card.clientWidth) / 2, 0);
+    track.scrollTo({
+      left: Math.max(targetLeft, 0),
+      behavior: "auto"
+    });
+  }
+
+  card.scrollIntoView({
+    block: "center",
+    inline: "center",
+    behavior: "auto"
+  });
+
+  return card;
+};
+
+const animateRandomCoverToCard = async (movie, destinationCard) => {
+  const randomPicker = getRandomPickerElements();
+  const sourceCover = randomPicker.ticketCover;
+  const destinationCover = destinationCard?.querySelector(".movie-card-cover");
+
+  if (
+    !(sourceCover instanceof HTMLElement) ||
+    !(destinationCover instanceof HTMLElement)
+  ) {
+    return;
+  }
+
+  const sourceRect = sourceCover.getBoundingClientRect();
+  const destinationRect = destinationCover.getBoundingClientRect();
+  const coverClone = document.createElement("img");
+
+  coverClone.className = "random-picker-cover-flight";
+  coverClone.src = movie.cover;
+  coverClone.alt = "";
+  coverClone.setAttribute("aria-hidden", "true");
+  Object.assign(coverClone.style, {
+    position: "fixed",
+    left: `${sourceRect.left}px`,
+    top: `${sourceRect.top}px`,
+    width: `${sourceRect.width}px`,
+    height: `${sourceRect.height}px`
+  });
+
+  document.body.append(coverClone);
+  randomPicker.ticket?.classList.add("is-cover-flying");
+
+  const animation = coverClone.animate(
+    [
+      {
+        left: `${sourceRect.left}px`,
+        top: `${sourceRect.top}px`,
+        width: `${sourceRect.width}px`,
+        height: `${sourceRect.height}px`,
+        borderRadius: "18px 18px 8px 8px",
+        filter: "drop-shadow(0 22px 42px rgba(0, 0, 0, 0.32))"
+      },
+      {
+        left: `${destinationRect.left}px`,
+        top: `${destinationRect.top}px`,
+        width: `${destinationRect.width}px`,
+        height: `${destinationRect.height}px`,
+        borderRadius: window.getComputedStyle(destinationCover).borderRadius || "12px",
+        filter: "drop-shadow(0 12px 24px rgba(0, 0, 0, 0.2))"
+      }
+    ],
+    {
+      duration: 420,
+      easing: "cubic-bezier(.18,.92,.28,1)"
+    }
+  );
+
+  try {
+    await animation.finished;
+  } catch (error) {
+    console.warn("Random cover transition interrupted:", error);
+  } finally {
+    coverClone.remove();
+    randomPicker.ticket?.classList.remove("is-cover-flying");
+  }
+};
+
+const chooseRandomPickerMovie = async () => {
+  const randomPicker = getRandomPickerElements();
+  const movie = appState.randomPickerMovie;
+
+  if (
+    !movie ||
+    appState.randomPickerChoosing ||
+    !(randomPicker.ticket instanceof HTMLButtonElement)
+  ) {
+    return;
+  }
+
+  appState.randomPickerChoosing = true;
+  randomPicker.ticket.disabled = true;
+  randomPicker.ticket.classList.add("is-choosing");
+  document.body.classList.remove("detail-open");
+
+  if (randomPicker.message) {
+    randomPicker.message.textContent = "Opening your random pick...";
+  }
+
+  const destinationCard = showMovieCardDestination(movie);
+
+  await new Promise((resolve) => window.setTimeout(resolve, 150));
+  randomPicker.ticket.classList.add("is-cut");
+
+  await new Promise((resolve) => window.setTimeout(resolve, 160));
+
+  if (destinationCard instanceof HTMLElement) {
+    randomPicker.overlay?.classList.add("is-handoff");
+    await animateRandomCoverToCard(movie, destinationCard);
+  }
+
+  if (randomPicker.overlay) {
+    randomPicker.overlay.hidden = true;
+    randomPicker.overlay.classList.remove("is-handoff");
+  }
+
+  appState.randomPickerMovie = null;
+  appState.randomPickerReady = false;
+  appState.randomPickerRevealed = false;
+  appState.randomPickerChoosing = false;
+  resetRandomPickerTicket();
+
+  openMovieDetail(movie, destinationCard);
 };
 
 const closeMovieDetail = () => {
@@ -1433,7 +1594,12 @@ const setupRandomPickerOverlay = () => {
   });
 
   randomPicker.ticket?.addEventListener("click", () => {
-    if (!appState.randomPickerReady || appState.randomPickerRevealed || !appState.randomPickerMovie) {
+    if (!appState.randomPickerReady || !appState.randomPickerMovie) {
+      return;
+    }
+
+    if (appState.randomPickerRevealed) {
+      chooseRandomPickerMovie();
       return;
     }
 
@@ -1442,8 +1608,10 @@ const setupRandomPickerOverlay = () => {
     setRandomPickerMovie(appState.randomPickerMovie);
 
     if (randomPicker.message) {
-      randomPicker.message.textContent = "Your unwatched pick is ready.";
+      randomPicker.message.textContent = "Press the ticket again to open it.";
     }
+
+    randomPicker.ticket?.setAttribute("aria-label", `Open details for ${appState.randomPickerMovie.title}`);
   });
 
   randomPicker.overlay.addEventListener("click", (event) => {

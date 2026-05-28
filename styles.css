@@ -1291,6 +1291,12 @@ img {
   inset: 0;
   background: rgba(10, 7, 7, 0.76);
   backdrop-filter: blur(16px);
+  transition: opacity 220ms ease, backdrop-filter 220ms ease;
+}
+
+.random-picker-overlay.is-handoff .random-picker-backdrop {
+  opacity: 0;
+  backdrop-filter: blur(0);
 }
 
 .random-picker-card {
@@ -1305,6 +1311,12 @@ img {
     linear-gradient(180deg, rgba(52, 34, 30, 0.98), rgba(20, 15, 15, 0.98));
   box-shadow: 0 36px 80px rgba(0, 0, 0, 0.45);
   overflow: hidden;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.random-picker-overlay.is-handoff .random-picker-card {
+  opacity: 0;
+  transform: translateY(10px) scale(0.985);
 }
 
 .random-picker-close {
@@ -1465,6 +1477,11 @@ img {
   transform: translate(-50%, calc(var(--random-ticket-ready-y) - 4px));
 }
 
+.random-picker-ticket.is-revealed:not(.is-choosing):hover,
+.random-picker-ticket.is-revealed:not(.is-choosing):focus-visible {
+  transform: translate(-50%, calc(var(--random-ticket-ready-y) - 5px));
+}
+
 .random-picker-ticket.is-empty {
   width: min(100%, 310px);
   min-height: 320px;
@@ -1484,6 +1501,16 @@ img {
     radial-gradient(circle at 22% 18%, rgba(243, 192, 79, 0.34), transparent 24%),
     radial-gradient(circle at 78% 16%, rgba(184, 40, 47, 0.34), transparent 22%),
     linear-gradient(180deg, rgba(79, 37, 31, 0.98), rgba(46, 24, 23, 0.98));
+  transform-origin: 50% 100%;
+  transition: opacity 80ms ease, transform 130ms cubic-bezier(.18,.92,.28,1);
+}
+
+.random-picker-ticket.is-cut .random-picker-ticket-cover {
+  transform: translateY(-4px) scaleY(0.992);
+}
+
+.random-picker-ticket.is-cover-flying .random-picker-ticket-cover {
+  opacity: 0;
 }
 
 .random-picker-ticket-cover::after {
@@ -1531,6 +1558,7 @@ img {
     linear-gradient(180deg, rgba(96, 46, 39, 0.98), rgba(70, 34, 30, 0.98));
   opacity: 0;
   transform: translateY(10px);
+  transform-origin: 50% 0;
   transition: opacity 180ms ease, transform 180ms ease;
 }
 
@@ -1540,6 +1568,15 @@ img {
 .random-picker-ticket.is-empty .random-picker-ticket-stub {
   opacity: 1;
   transform: translateY(0);
+}
+
+.random-picker-ticket.is-choosing .random-picker-ticket-stub > * {
+  opacity: 0;
+  transition: opacity 110ms ease;
+}
+
+.random-picker-ticket.is-cut .random-picker-ticket-stub {
+  animation: random-ticket-stub-fall 520ms cubic-bezier(.23,.7,.18,1) forwards;
 }
 
 .random-picker-ticket-kicker {
@@ -1639,6 +1676,34 @@ img {
 
 .random-picker-ticket-corners::after {
   right: -8px;
+}
+
+.random-picker-cover-flight {
+  z-index: 80;
+  object-fit: cover;
+  pointer-events: none;
+  border: 1px solid rgba(243, 192, 79, 0.24);
+}
+
+@keyframes random-ticket-stub-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+
+  20% {
+    transform: translateY(8px) rotate(-1.4deg);
+  }
+
+  48% {
+    opacity: 1;
+    transform: translateY(86px) rotate(5deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(220px) rotate(10deg);
+  }
 }
 
 @keyframes random-ticket-print {

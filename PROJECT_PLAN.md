@@ -98,6 +98,7 @@ Implemented so far:
 - Persistent `Show:` toolbar preferences saved in local storage
 - Responsive decade navigation that expands when space allows and scrolls when it does not
 - Random top-bar action wired to an animated ticket-printer picker for unwatched movies
+- Revealed random tickets can be pressed again to cut away the ticket stub, animate the cover back to its grid card, and open the full detail card
 - Top-bar action buttons reserved for filter and search
 - Real movie coverage for 1950 through 1959 with imported poster art
 - Metadata-backed catalog import for the 1950s dataset
@@ -110,7 +111,7 @@ The current UI checkpoint should be committed as a milestone before the next fea
 Most likely next work areas:
 
 - Hook the top-bar filter and search buttons to real behavior
-- Decide whether the random ticket should open the full detail card after reveal
+- Tune the random ticket handoff timing after device testing
 - Add deeper filtering and search flows
 - Expand beyond the 1950s into additional decade datasets
 - Add richer editing inside the detail card

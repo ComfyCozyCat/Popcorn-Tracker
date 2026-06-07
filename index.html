@@ -25,7 +25,10 @@
           <button id="random-movie-button" class="icon-button" type="button" aria-label="Pick a random movie">
             <img class="icon-button-image icon-button-image-random" src="assets/icons/dice.svg" alt="" aria-hidden="true">
           </button>
-          <button id="search-toggle-button" class="icon-button" type="button" aria-label="Search and filter movies" aria-expanded="false" aria-controls="filter-panel">
+          <button id="filter-toggle-button" class="icon-button" type="button" aria-label="Filter movies" aria-expanded="false" aria-controls="filter-panel">
+            <img class="icon-button-image" src="assets/icons/filter.svg" alt="" aria-hidden="true">
+          </button>
+          <button id="search-toggle-button" class="icon-button" type="button" aria-label="Search movies" aria-expanded="false" aria-controls="search-panel">
             <svg aria-hidden="true" viewBox="0 0 24 24">
               <path d="m21 21-4.3-4.3"></path>
               <circle cx="11" cy="11" r="7"></circle>
@@ -69,13 +72,13 @@
         </button>
       </div>
 
-      <section id="filter-panel" class="filter-panel" aria-label="Search and filter movies" hidden>
+      <section id="search-panel" class="search-panel" aria-label="Search movies" hidden>
         <div class="filter-panel-header">
           <div>
-            <h2>Search & Filter</h2>
-            <p id="filter-summary" class="filter-summary">Showing all movies</p>
+            <h2>Search</h2>
+            <p id="search-summary" class="filter-summary">Showing all movies</p>
           </div>
-          <button id="filter-clear-button" class="filter-clear-button" type="button" hidden>
+          <button id="search-clear-button" class="filter-clear-button" type="button" hidden>
             Clear
           </button>
         </div>
@@ -87,10 +90,22 @@
             type="search"
             autocomplete="off"
             list="search-suggestions"
-            placeholder="Title, studio, or tag"
+            placeholder="Title, studio, actor, or tag"
           >
         </label>
         <datalist id="search-suggestions"></datalist>
+      </section>
+
+      <section id="filter-panel" class="filter-panel" aria-label="Movie filters" hidden>
+        <div class="filter-panel-header">
+          <div>
+            <h2>Filters</h2>
+            <p id="filter-summary" class="filter-summary">Showing all movies</p>
+          </div>
+          <button id="filter-clear-button" class="filter-clear-button" type="button" hidden>
+            Clear
+          </button>
+        </div>
 
         <div id="filter-groups" class="filter-groups"></div>
       </section>

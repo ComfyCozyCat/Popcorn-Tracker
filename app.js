@@ -53,6 +53,7 @@ const MOVIES_PER_YEAR = 10;
 const CARD_DISPLAY_SETTINGS_KEY = "popcorn-archive-card-display";
 const CATALOG_PATH = "assets/top_movies_catalog_with_metadata.csv";
 const RANDOM_PICKER_PRINT_DURATION = 4200;
+const DETAIL_INTERACTION_GUARD_MS = 520;
 const SENTIMENT = {
   UP: "up",
   DOWN: "down"
@@ -162,7 +163,9 @@ const appState = {
   randomPickerRevealed: false,
   randomPickerChoosing: false,
   activeFilters: new Set(),
-  searchQuery: ""
+  searchQuery: "",
+  detailInteractionBlockedUntil: 0,
+  detailInteractionGuardTimer: null
 };
 
 const registerServiceWorker = async () => {
@@ -1013,7 +1016,7 @@ const setupCardDisplayControls = () => {
 
 const getFilterElements = () => {
   return {
-    toggleButton: document.getElementById("search-toggle-button"),
+    toggleButton: document.getElementById("filter-toggle-button"),
     panel: document.getElementById("filter-panel"),
     groups: document.getElementById("filter-groups"),
     summary: document.getElementById("filter-summary"),
@@ -1025,15 +1028,35 @@ const getFilterElements = () => {
 const getSearchElements = () => {
   return {
     toggleButton: document.getElementById("search-toggle-button"),
-    panel: document.getElementById("filter-panel"),
+    panel: document.getElementById("search-panel"),
     input: document.getElementById("movie-search-input"),
     suggestions: document.getElementById("search-suggestions"),
-    summary: document.getElementById("filter-summary"),
-    clearButton: document.getElementById("filter-clear-button")
+    summary: document.getElementById("search-summary"),
+    clearButton: document.getElementById("search-clear-button")
   };
 };
 
 const getMovieCards = () => Array.from(document.querySelectorAll(".movie-card"));
+
+const setPanelOpen = (panel, toggleButton, isOpen) => {
+  if (panel instanceof HTMLElement) {
+    panel.hidden = !isOpen;
+  }
+
+  if (toggleButton instanceof HTMLButtonElement) {
+    toggleButton.setAttribute("aria-expanded", String(isOpen));
+  }
+};
+
+const closeSearchPanel = () => {
+  const { panel, toggleButton } = getSearchElements();
+  setPanelOpen(panel, toggleButton, false);
+};
+
+const closeFilterPanel = () => {
+  const { panel, toggleButton } = getFilterElements();
+  setPanelOpen(panel, toggleButton, false);
+};
 
 const getFilterResultCounts = () => {
   const cards = getMovieCards();
@@ -1047,7 +1070,7 @@ const getFilterResultCounts = () => {
 
 const syncFilterButtonState = () => {
   const { toggleButton } = getFilterElements();
-  const hasFilters = hasActiveGridQuery();
+  const hasFilters = appState.activeFilters.size > 0;
 
   if (!(toggleButton instanceof HTMLButtonElement)) {
     return;
@@ -1063,6 +1086,7 @@ const hasActiveGridQuery = () => appState.activeFilters.size > 0 || hasActiveSea
 
 const syncFilterPanelState = () => {
   const { groups, summary, clearButton, emptyState } = getFilterElements();
+  const hasFilters = appState.activeFilters.size > 0;
   const hasQuery = hasActiveGridQuery();
   const counts = getFilterResultCounts();
 
@@ -1077,13 +1101,13 @@ const syncFilterPanelState = () => {
   });
 
   if (summary) {
-    summary.textContent = hasQuery
+    summary.textContent = hasFilters
       ? `Showing ${counts.visible} of ${counts.total} movies`
       : "Showing all movies";
   }
 
   if (clearButton) {
-    clearButton.hidden = !hasQuery;
+    clearButton.hidden = !hasFilters;
   }
 
   if (emptyState) {
@@ -1094,17 +1118,27 @@ const syncFilterPanelState = () => {
 };
 
 const syncSearchPanelState = () => {
-  const { toggleButton, input } = getSearchElements();
+  const { toggleButton, input, summary, clearButton } = getSearchElements();
   const hasSearch = hasActiveSearch();
-  const hasQuery = hasActiveGridQuery();
+  const counts = getFilterResultCounts();
 
   if (toggleButton instanceof HTMLButtonElement) {
-    toggleButton.classList.toggle("is-active", hasQuery);
-    toggleButton.setAttribute("aria-pressed", String(hasQuery));
+    toggleButton.classList.toggle("is-active", hasSearch);
+    toggleButton.setAttribute("aria-pressed", String(hasSearch));
   }
 
   if (input instanceof HTMLInputElement && input.value !== appState.searchQuery) {
     input.value = appState.searchQuery;
+  }
+
+  if (summary) {
+    summary.textContent = hasSearch
+      ? `Showing ${counts.visible} of ${counts.total} movies`
+      : "Showing all movies";
+  }
+
+  if (clearButton) {
+    clearButton.hidden = !hasSearch;
   }
 };
 
@@ -1158,9 +1192,13 @@ const buildFilterChip = (tag) => {
 };
 
 const setupFilterPanel = () => {
-  const { groups, clearButton } = getFilterElements();
+  const { toggleButton, panel, groups, clearButton } = getFilterElements();
 
-  if (!(groups instanceof HTMLElement)) {
+  if (
+    !(toggleButton instanceof HTMLButtonElement) ||
+    !(panel instanceof HTMLElement) ||
+    !(groups instanceof HTMLElement)
+  ) {
     return;
   }
 
@@ -1186,9 +1224,15 @@ const setupFilterPanel = () => {
     groups.append(groupElement);
   });
 
+  toggleButton.addEventListener("click", () => {
+    const isOpen = panel.hidden;
+    closeSearchPanel();
+    setPanelOpen(panel, toggleButton, isOpen);
+  });
+
   clearButton?.addEventListener("click", () => {
     appState.activeFilters.clear();
-    setSearchQuery("");
+    applyMovieFilters();
   });
 
   syncFilterPanelState();
@@ -1201,8 +1245,8 @@ const setSearchQuery = (value, options = {}) => {
   appState.searchQuery = String(value || "").trim();
 
   if (panel && openPanel) {
-    panel.hidden = false;
-    toggleButton?.setAttribute("aria-expanded", "true");
+    closeFilterPanel();
+    setPanelOpen(panel, toggleButton, true);
   }
 
   applyMovieFilters();
@@ -1293,8 +1337,8 @@ const setupSearchPanel = () => {
 
   toggleButton.addEventListener("click", () => {
     const isOpen = panel.hidden;
-    panel.hidden = !isOpen;
-    toggleButton.setAttribute("aria-expanded", String(isOpen));
+    closeFilterPanel();
+    setPanelOpen(panel, toggleButton, isOpen);
 
     if (isOpen) {
       window.requestAnimationFrame(() => {
@@ -1318,7 +1362,7 @@ const setupSearchPanel = () => {
     }
 
     panel.hidden = true;
-    toggleButton.setAttribute("aria-expanded", "false");
+    setPanelOpen(panel, toggleButton, false);
     toggleButton.focus();
   });
 
@@ -1456,12 +1500,37 @@ const buildSearchShortcutButton = (label, className) => {
   button.textContent = label;
   button.setAttribute("aria-label", `Search for ${label}`);
 
-  button.addEventListener("click", () => {
+  button.addEventListener("click", (event) => {
+    if (isDetailInteractionBlocked()) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
     closeMovieDetail();
     setSearchQuery(label, { openPanel: true, focusInput: true });
   });
 
   return button;
+};
+
+const isDetailInteractionBlocked = () => performance.now() < appState.detailInteractionBlockedUntil;
+
+const guardDetailInteractions = () => {
+  const detail = getDetailElements();
+
+  appState.detailInteractionBlockedUntil = performance.now() + DETAIL_INTERACTION_GUARD_MS;
+  detail.card?.classList.add("is-interaction-guarded");
+
+  if (appState.detailInteractionGuardTimer) {
+    window.clearTimeout(appState.detailInteractionGuardTimer);
+  }
+
+  appState.detailInteractionGuardTimer = window.setTimeout(() => {
+    appState.detailInteractionBlockedUntil = 0;
+    appState.detailInteractionGuardTimer = null;
+    detail.card?.classList.remove("is-interaction-guarded");
+  }, DETAIL_INTERACTION_GUARD_MS);
 };
 
 const paintDetailMovieInfo = (movie) => {
@@ -1973,6 +2042,7 @@ const chooseRandomPickerMovie = async () => {
   appState.randomPickerChoosing = false;
   resetRandomPickerTicket();
 
+  guardDetailInteractions();
   openMovieDetail(movie, destinationCard);
 };
 
@@ -2079,6 +2149,28 @@ const setupMovieDetailOverlay = () => {
 
   resetMovieDetail();
 
+  detail.card.addEventListener("click", (event) => {
+    if (!isDetailInteractionBlocked()) {
+      return;
+    }
+
+    const target = event.target;
+
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    if (
+      target.closest(".movie-detail-cast-button") ||
+      target.closest(".movie-detail-distributor") ||
+      target.closest(".movie-detail-action") ||
+      target.closest(".movie-detail-link")
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }, true);
+
   detail.overlay.addEventListener("click", (event) => {
     const target = event.target;
 
@@ -2096,6 +2188,10 @@ const setupMovieDetailOverlay = () => {
   });
 
   detail.distributor?.addEventListener("click", () => {
+    if (isDetailInteractionBlocked()) {
+      return;
+    }
+
     const searchValue = detail.distributor?.dataset.searchValue || "";
 
     if (!searchValue) {
@@ -2107,6 +2203,10 @@ const setupMovieDetailOverlay = () => {
   });
 
   detail.favoriteButton?.addEventListener("click", async () => {
+    if (isDetailInteractionBlocked()) {
+      return;
+    }
+
     if (!appState.activeMovie) {
       return;
     }
@@ -2116,6 +2216,10 @@ const setupMovieDetailOverlay = () => {
   });
 
   detail.likeButton?.addEventListener("click", async () => {
+    if (isDetailInteractionBlocked()) {
+      return;
+    }
+
     if (!appState.activeMovie) {
       return;
     }
@@ -2130,6 +2234,10 @@ const setupMovieDetailOverlay = () => {
   });
 
   detail.dislikeButton?.addEventListener("click", async () => {
+    if (isDetailInteractionBlocked()) {
+      return;
+    }
+
     if (!appState.activeMovie) {
       return;
     }
@@ -2144,6 +2252,10 @@ const setupMovieDetailOverlay = () => {
   });
 
   detail.calendarButton?.addEventListener("click", async () => {
+    if (isDetailInteractionBlocked()) {
+      return;
+    }
+
     if (!appState.activeMovie) {
       return;
     }
@@ -2273,6 +2385,10 @@ const enablePointerDragging = (track) => {
   };
 
   track.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "touch") {
+      return;
+    }
+
     if (event.pointerType === "mouse" && event.button !== 0) {
       return;
     }
@@ -2603,9 +2719,9 @@ const updateYearProgress = (year) => {
   }
 
   const cards = Array.from(row.querySelectorAll(".movie-card"));
-  const hasFilters = appState.activeFilters.size > 0;
+  const hasQuery = hasActiveGridQuery();
   const visibleCards = cards.filter((card) => !card.classList.contains("is-filtered-out"));
-  const countedCards = hasFilters ? visibleCards : cards;
+  const countedCards = hasQuery ? visibleCards : cards;
   const totalCount = countedCards.length;
   const watchedCount = countedCards.filter((card) => card.movieData?.watched).length;
   const progressPercent = totalCount > 0 ? (watchedCount / totalCount) * 100 : 0;
@@ -2614,7 +2730,7 @@ const updateYearProgress = (year) => {
   const progressFill = row.querySelector('[data-role="year-progress-fill"]');
 
   if (count instanceof HTMLElement) {
-    count.textContent = hasFilters
+    count.textContent = hasQuery
       ? `(${totalCount}/${cards.length} shown)`
       : `(${watchedCount}/${totalCount} watched)`;
   }

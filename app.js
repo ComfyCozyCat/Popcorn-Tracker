@@ -1443,13 +1443,17 @@ const createMovieCard = (movie) => {
   paintGridCardActions(card, movie);
   applyCardDisplayState(card);
 
+  card.addEventListener("click", () => {
+    openMovieDetail(movie, card);
+  });
+
   card.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" && event.key !== " ") {
       return;
     }
 
     event.preventDefault();
-    openMovieDetail(movie, card);
+    card.click();
   });
 
   return card;
